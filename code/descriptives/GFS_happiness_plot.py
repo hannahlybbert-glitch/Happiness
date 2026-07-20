@@ -49,8 +49,8 @@ def label_age(series):
     """Bin AGE_Y1 into decade-ish groups. 99 means 99+ (top-coded), so it is a valid age, not a skip code."""
     exclude_codes = STANDARD_MISSING_CODES - {99}
     age = clean_numeric(series, exclude_codes)
-    bins = [18, 25, 35, 45, 55, 65, 75, 85, 95, np.inf]
-    labels = ["18-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75-84", "85-94", "95+"]
+    bins = [18, 25, 35, 45, 55, 65, 75, np.inf]
+    labels = ["18-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75+"]
     return pd.cut(age, bins=bins, labels=labels, right=False), labels
 
 
@@ -63,8 +63,8 @@ def label_born_country(series):
 
 def label_education(series):
     code = clean_numeric(series, STANDARD_MISSING_CODES)
-    mapping = {1: "Elementary or less", 2: "Secondary", 3: "College degree or equivalent"}
-    labels = ["Elementary or less", "Secondary", "College degree or equivalent"]
+    mapping = {1: "Elementary or less", 2: "Secondary", 3: "4 years post HS"}
+    labels = ["Elementary or less", "Secondary", "4 years post HS"]
     return code.map(mapping), labels
 
 
@@ -93,10 +93,9 @@ def label_marital_status(series):
 
 def label_num_children(series):
     code = clean_numeric(series, STANDARD_MISSING_CODES)
-    label = pd.Series(np.where(code == 0, "No Children", "Children"), index=series.index, dtype=object)
-    label[code.isna()] = np.nan
-    labels = ["No Children", "Children"]
-    return label, labels
+    bins = [-0.5, 0.5, 1.5, 2.5, 3.5, np.inf]
+    labels = ["0", "1", "2", "3", "4+"]
+    return pd.cut(code, bins=bins, labels=labels), labels
 
 
 def label_own_rent_home(series):
@@ -175,12 +174,12 @@ def label_rel_important(series):
 # Each spec: (category display name, Y1 column, Y2 column or None if it doesn't exist, labeling function)
 SUBGROUP_SPECS = [
     ("Age", "AGE_Y1", "AGE_Y2", label_age),
-    ("Native/Foreign born", "BORN_COUNTRY_Y1", None, label_born_country),
+    ("Native or Foreign Born", "BORN_COUNTRY_Y1", None, label_born_country),
     ("Education", "EDUCATION_3_Y1", "EDUCATION_3_Y2", label_education),
     ("Employment", "EMPLOYMENT_Y1", "EMPLOYMENT_Y2", label_employment),
     ("Gender", "GENDER", None, label_gender),
     ("Marital Status", "MARITAL_STATUS_Y1", "MARITAL_STATUS_Y2", label_marital_status),
-    ("Children", "NUM_CHILDREN_Y1", "NUM_CHILDREN_Y2", label_num_children),
+    ("Children in HH", "NUM_CHILDREN_Y1", "NUM_CHILDREN_Y2", label_num_children),
     ("Own or Rent", "OWN_RENT_HOME_Y1", "OWN_RENT_HOME_Y2", label_own_rent_home),
     ("Urban vs Rural", "URBAN_RURAL_Y1", "URBAN_RURAL_Y2", label_urban_rural),
     ("Income", "INCOME_Y1", "INCOME_Y2", label_income),
@@ -222,8 +221,9 @@ def summarize_subgroup(happy, group_labels, level_order):
 
 def build_results(df, wave):
     """Run every subgroup spec (resolved to its wave-specific column) and return one long dataframe:
-    category, subgroup, n, mean, ci_lo, ci_hi."""
+    category, subgroup, n, mean, ci_lo, ci_hi, plus the overall sample mean happiness."""
     happy = clean_numeric(df[HAPPY_VAR_BY_WAVE[wave]], STANDARD_MISSING_CODES)
+    overall_mean = happy.mean()
 
     results = []
     for category, var_y1, var_y2, label_func in SUBGROUP_SPECS:
@@ -235,7 +235,7 @@ def build_results(df, wave):
         summary.insert(0, "category", category)
         results.append(summary)
 
-    return pd.concat(results, ignore_index=True)
+    return pd.concat(results, ignore_index=True), overall_mean
 
 
 CATEGORY_STRIP_COLOR = "#767676"  # darker gray box for the category header
@@ -264,7 +264,10 @@ def wrap_two_lines(text):
     return " ".join(words[:best_split]) + "\n" + " ".join(words[best_split:])
 
 
-def plot_results(results, output_path, title):
+TITLE_BLOCK_HEIGHT_IN = 0.9  # inches reserved for the title + subtitle row
+
+
+def plot_results(results, overall_mean, output_path, title, subtitle):
     """Draw one point + 95% CI per subgroup, grouped into category blocks, and save to output_path."""
     apply_plot_style()
 
@@ -295,13 +298,25 @@ def plot_results(results, output_path, title):
     y_lo = min(y_positions) - row_gap
 
     n_rows = len(results)
-    fig_height = max(6, 0.42 * n_rows + 1.5)
-    fig, (ax_label, ax_plot) = plt.subplots(
-        1, 2, figsize=(11, fig_height),
-        gridspec_kw={"width_ratios": [1.4, 2.2], "wspace": 0.03},
-        sharey=True,
-        constrained_layout=True,
+    plot_height = max(6, 0.42 * n_rows + 1.5)
+    fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
+
+    fig = plt.figure(figsize=(11, fig_height), constrained_layout=True)
+    gs = fig.add_gridspec(
+        2, 2,
+        height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
+        width_ratios=[1.4, 2.2],
+        wspace=0.03,
     )
+    ax_title = fig.add_subplot(gs[0, :])
+    ax_label = fig.add_subplot(gs[1, 0])
+    ax_plot = fig.add_subplot(gs[1, 1], sharey=ax_label)
+
+    ax_title.text(0.5, 0.68, title, transform=ax_title.transAxes,
+                  ha="center", va="center", fontsize=20)
+    ax_title.text(0.5, 0.22, subtitle, transform=ax_title.transAxes,
+                  ha="center", va="center", fontsize=11, color="dimgray")
+    ax_title.axis("off")
 
     # --- Label panel: darker gray category strip (vertical text) + lighter gray subgroup box ---
     ax_label.set_xlim(0, 1)
@@ -317,7 +332,7 @@ def plot_results(results, output_path, title):
 
     for row in results.itertuples():
         ax_label.text(
-            STRIP_SPLIT + 0.04, row.y, f"{row.subgroup}",
+            STRIP_SPLIT + 0.04, row.y, f"{row.subgroup} (n={row.n:,})",
             ha="left", va="center", fontsize=11.5, color="black",
         )
 
@@ -328,11 +343,13 @@ def plot_results(results, output_path, title):
     ax_label.grid(False)
 
     # --- Plot panel: point estimate + 95% CI ---
+    ax_plot.axvline(overall_mean, linestyle="--", linewidth=1.2, color="dimgray", zorder=0)
+
     ax_plot.errorbar(
         results["mean"], results["y"],
         xerr=[results["mean"] - results["ci_lo"], results["ci_hi"] - results["mean"]],
         fmt="o", color=UCHICAGO_MAROON, ecolor=UCHICAGO_MAROON,
-        elinewidth=1.3, capsize=0, markersize=5, linewidth=0,
+        elinewidth=1.3, capsize=3, capthick=1.3, markersize=5, linewidth=0,
     )
 
     for boundary in boundaries[:-1]:
@@ -343,20 +360,21 @@ def plot_results(results, output_path, title):
     ax_plot.grid(axis="y", visible=False)
     ax_plot.set_xlabel("Average Happiness Score")
 
-    fig.suptitle(title, fontsize=17)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.1)
     plt.close(fig)
 
 
+SUBTITLE = "Global Flourishing Survey, 2022; raw survey subgroup means with 95% confidence intervals"
+
 WAVE_CONFIG = {
     "Y1": {
         "output_file": os.path.join(OUTPUT_DIR, "GFS_happiness_plot.png"),
-        "title": "Happiness across US subgroups",
+        "title": "Happiness across U.S. subgroups",
     },
     "Y2": {
         "output_file": os.path.join(OUTPUT_DIR, "GFS_happiness_plot_Y2.png"),
-        "title": "Happiness across US subgroups (Wave 2)",
+        "title": "Happiness across U.S. subgroups (Wave 2)",
     },
 }
 
@@ -364,8 +382,8 @@ WAVE_CONFIG = {
 def main():
     df = load_data(INPUT_FILE)
     for wave, config in WAVE_CONFIG.items():
-        results = build_results(df, wave)
-        plot_results(results, config["output_file"], config["title"])
+        results, overall_mean = build_results(df, wave)
+        plot_results(results, overall_mean, config["output_file"], config["title"], SUBTITLE)
         print(f"Wrote plot with {len(results)} subgroup rows to {config['output_file']}")
 
 
