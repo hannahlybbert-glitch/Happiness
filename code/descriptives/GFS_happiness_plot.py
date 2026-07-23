@@ -278,7 +278,6 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
     y = 0.0
     y_positions = []
     category_blocks = {}  # category -> (y_top, y_bottom) box edges
-    boundaries = []
 
     for category in category_order:
         sub = results[results["category"] == category]
@@ -289,7 +288,13 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
         y_bottom = y + row_gap / 2
         category_blocks[category] = (y_top, y_bottom)
         y -= category_gap
-        boundaries.append(y + category_gap / 2)
+
+    # Boundary between two consecutive categories sits midway between the bottom
+    # edge of the box above it and the top edge of the box below it.
+    boundaries = [
+        (category_blocks[category_order[i]][1] + category_blocks[category_order[i + 1]][0]) / 2
+        for i in range(len(category_order) - 1)
+    ]
 
     results = results.copy()
     results["y"] = y_positions
@@ -352,7 +357,7 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
         elinewidth=1.3, capsize=3, capthick=1.3, markersize=5, linewidth=0,
     )
 
-    for boundary in boundaries[:-1]:
+    for boundary in boundaries:
         ax_plot.axhline(boundary, linestyle=":", linewidth=0.8, color="#888888")
 
     ax_plot.set_ylim(y_lo, y_hi)
