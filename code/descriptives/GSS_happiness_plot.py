@@ -81,7 +81,11 @@ def label_income(series):
     """REALINC (already inflation-adjusted) split into terciles pooled across 2004-2024."""
     code = clean_numeric(series, set())
     labels = ["Low", "Mid", "High"]
-    return pd.qcut(code, q=3, labels=labels), labels
+    binned, bin_edges = pd.qcut(code, q=3, labels=labels, retbins=True)
+    print("Income tercile ranges (REALINC):")
+    for lo, hi, label in zip(bin_edges[:-1], bin_edges[1:], labels):
+        print(f"  {label}: {lo:,.2f} - {hi:,.2f}")
+    return binned, labels
 
 
 def label_employment(series):
