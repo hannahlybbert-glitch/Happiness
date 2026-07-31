@@ -204,7 +204,9 @@ def build_results(df):
     """Run every subgroup spec and return one long dataframe: category, subgroup, n, mean,
     ci_lo, ci_hi, plus the overall sample mean happiness."""
     happy = label_happy(df["HAPPY"])
-    overall_mean = happy.mean()
+    happy_valid = happy.dropna()
+    overall_mean = happy_valid.mean()
+    overall_se = happy_valid.std(ddof=1) / np.sqrt(len(happy_valid))
 
     results = []
     for category, var, label_func in SUBGROUP_SPECS:
@@ -215,7 +217,7 @@ def build_results(df):
         summary.insert(0, "category", category)
         results.append(summary)
 
-    return pd.concat(results, ignore_index=True), overall_mean
+    return pd.concat(results, ignore_index=True), overall_mean, overall_se
 
 
 CATEGORY_STRIP_COLOR = "#767676"  # darker gray box for the category header
@@ -356,9 +358,17 @@ SUBTITLE = "General Social Survey, 2004-2024; raw survey subgroup means with 95%
 
 def main():
     df = load_data(INPUT_FILE)
-    results, overall_mean = build_results(df)
+    results, overall_mean, overall_se = build_results(df)
     plot_results(results, overall_mean, OUTPUT_FILE, TITLE, SUBTITLE)
     print(f"Overall average happiness score across the sample: {overall_mean:.3f}")
+    ci_50 = (overall_mean - 0.674 * overall_se, overall_mean + 0.674 * overall_se)
+    ci_75 = (overall_mean - 1.150 * overall_se, overall_mean + 1.150 * overall_se)
+    ci_90 = (overall_mean - 1.645 * overall_se, overall_mean + 1.645 * overall_se)
+    ci_95 = (overall_mean - 1.96 * overall_se, overall_mean + 1.96 * overall_se)
+    print(f"50% CI: ({ci_50[0]:.3f}, {ci_50[1]:.3f})")
+    print(f"75% CI: ({ci_75[0]:.3f}, {ci_75[1]:.3f})")
+    print(f"90% CI: ({ci_90[0]:.3f}, {ci_90[1]:.3f})")
+    print(f"95% CI: ({ci_95[0]:.3f}, {ci_95[1]:.3f})")
     print(f"Wrote plot with {len(results)} subgroup rows to {OUTPUT_FILE}")
 
 
