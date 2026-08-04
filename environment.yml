@@ -1,0 +1,12 @@
+name: happiness
+channels:
+  - conda-forge
+dependencies:
+  # Python: data cleaning (ProcessGSS/ProcessGFS) and matplotlib descriptive plots,
+  # including the survey-weighted analysis (GSS_happiness_plot_weighted.py) - the
+  # design-based estimator is hand-implemented in pandas/numpy, no extra package needed.
+  - python=3.11
+  - pandas
+  - numpy
+  - matplotlib
+  - pyreadstat      # reads the raw GSS .sas7bdat file
