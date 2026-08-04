@@ -38,11 +38,12 @@ General Social Survey, 2004-2024; raw survey subgroup means and standard deviati
 | Urban vs Rural | Big city | 8,937 | 2.058 | 0.661 |
 |  | Suburb | 15,074 | 2.102 | 0.652 |
 |  | Small/rural town | 4,878 | 2.107 | 0.655 |
-| Health | Good | 16,641 | 2.168 | 0.640 |
+| Health | Excellent | 5,127 | 2.339 | 0.650 |
+|  | Good | 11,514 | 2.092 | 0.621 |
 |  | Fair | 4,947 | 1.855 | 0.640 |
 |  | Poor | 1,171 | 1.658 | 0.690 |
-| Socializing with Friends | Weekly or more | 7,390 | 2.166 | 0.614 |
+| Socializing with Friends | Never | 2,097 | 1.941 | 0.686 |
 |  | Sometimes | 9,743 | 2.112 | 0.628 |
-|  | Never | 2,097 | 1.941 | 0.686 |
+|  | Weekly or more | 7,390 | 2.166 | 0.614 |
 | Own or Rent | Own | 12,129 | 2.176 | 0.620 |
 |  | Rent | 6,696 | 2.007 | 0.641 |

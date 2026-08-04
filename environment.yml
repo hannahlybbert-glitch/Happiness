@@ -10,3 +10,9 @@ dependencies:
   - numpy
   - matplotlib
   - pyreadstat      # reads the raw GSS .sas7bdat file
+
+  # R: regression step for the betas plot (code/descriptives/betas_plot/). Base R only
+  # (lm(), matrix algebra for cluster-robust SEs) plus `here` for path resolution -
+  # deliberately avoids Matrix/survey, which hit an unresolved Windows/mingw-w64 issue.
+  - r-base
+  - r-here

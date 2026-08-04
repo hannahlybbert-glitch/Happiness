@@ -141,8 +141,8 @@ def label_urban(series):
 
 def label_health(series):
     code = clean_numeric(series, set())
-    mapping = {1: "Good", 2: "Good", 3: "Fair", 4: "Poor"}
-    labels = ["Good", "Fair", "Poor"]
+    mapping = {1: "Excellent", 2: "Good", 3: "Fair", 4: "Poor"}
+    labels = ["Excellent", "Good", "Fair", "Poor"]
     return code.map(mapping), labels
 
 
@@ -151,7 +151,7 @@ def label_socfrend(series):
     mapping = {7: "Never"}
     mapping.update({v: "Weekly or more" for v in range(1, 4)})
     mapping.update({v: "Sometimes" for v in range(4, 7)})
-    labels = ["Weekly or more", "Sometimes", "Never"]
+    labels = ["Never", "Sometimes", "Weekly or more"]
     return code.map(mapping), labels
 
 

@@ -139,10 +139,10 @@ URBAN_LEVELS <- c("Big city", "Suburb", "Small/rural town")
 
 label_health <- function(x) {
   code <- clean_numeric(x)
-  mapping <- c(`1` = "Good", `2` = "Good", `3` = "Fair", `4` = "Poor")
+  mapping <- c(`1` = "Excellent", `2` = "Good", `3` = "Fair", `4` = "Poor")
   map_values(code, mapping)
 }
-HEALTH_LEVELS <- c("Good", "Fair", "Poor")
+HEALTH_LEVELS <- c("Excellent", "Good", "Fair", "Poor")
 
 label_socfrend <- function(x) {
   code <- clean_numeric(x)
