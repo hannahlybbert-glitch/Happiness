@@ -26,6 +26,8 @@ from plot_style import apply_plot_style, UCHICAGO_MAROON  # noqa: E402
 
 INPUT_FILE = os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main.csv")
 OUTPUT_FILE = os.path.join(PROJECT_ROOT, "output", "descriptives", "GSS", "GSS_happiness_plot.png")
+OUTPUT_TABLE_MD = os.path.join(PROJECT_ROOT, "output", "descriptives", "GSS", "GSS_happiness_table.md")
+OUTPUT_TABLE_TEX = os.path.join(PROJECT_ROOT, "output", "descriptives", "GSS", "GSS_happiness_table.tex")
 
 
 def load_data(file_path):
@@ -180,7 +182,7 @@ SUBGROUP_SPECS = [
 
 
 def summarize_subgroup(happy, group_labels, level_order):
-    """Compute n, mean, and 95% CI of happy for each level in level_order (dropping missing on either side)."""
+    """Compute n, mean, SD, and 95% CI of happy for each level in level_order (dropping missing on either side)."""
     temp = pd.DataFrame({"happy": happy, "group": group_labels}).dropna()
     rows = []
     for level in level_order:
@@ -189,11 +191,13 @@ def summarize_subgroup(happy, group_labels, level_order):
         if n == 0:
             continue
         mean = vals.mean()
-        se = vals.std(ddof=1) / np.sqrt(n)
+        sd = vals.std(ddof=1)
+        se = sd / np.sqrt(n)
         rows.append({
             "subgroup": level,
             "n": n,
             "mean": mean,
+            "sd": sd,
             "ci_lo": mean - 1.96 * se,
             "ci_hi": mean + 1.96 * se,
         })
@@ -201,12 +205,15 @@ def summarize_subgroup(happy, group_labels, level_order):
 
 
 def build_results(df):
-    """Run every subgroup spec and return one long dataframe: category, subgroup, n, mean,
-    ci_lo, ci_hi, plus the overall sample mean happiness."""
+    """Run every subgroup spec and return one long dataframe: category, subgroup, n, mean, sd,
+    ci_lo, ci_hi, plus a dict of overall sample happiness stats (n, mean, sd, se)."""
     happy = label_happy(df["HAPPY"])
     happy_valid = happy.dropna()
+    overall_n = len(happy_valid)
     overall_mean = happy_valid.mean()
-    overall_se = happy_valid.std(ddof=1) / np.sqrt(len(happy_valid))
+    overall_sd = happy_valid.std(ddof=1)
+    overall_se = overall_sd / np.sqrt(overall_n)
+    overall = {"n": overall_n, "mean": overall_mean, "sd": overall_sd, "se": overall_se}
 
     results = []
     for category, var, label_func in SUBGROUP_SPECS:
@@ -217,7 +224,7 @@ def build_results(df):
         summary.insert(0, "category", category)
         results.append(summary)
 
-    return pd.concat(results, ignore_index=True), overall_mean, overall_se
+    return pd.concat(results, ignore_index=True), overall
 
 
 CATEGORY_STRIP_COLOR = "#767676"  # darker gray box for the category header
@@ -352,15 +359,69 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
     plt.close(fig)
 
 
+def write_markdown_table(results, overall, output_path, title, subtitle):
+    """Write a category/subgroup table of n, mean, and SD of happiness to a Markdown file."""
+    lines = [f"# {title}", "", subtitle, "", "| Category | Subgroup | N | Mean | SD |",
+             "|---|---|---|---|---|",
+             f"| Overall | Overall | {overall['n']:,} | {overall['mean']:.3f} | {overall['sd']:.3f} |"]
+
+    last_category = None
+    for row in results.itertuples():
+        category_cell = row.category if row.category != last_category else ""
+        lines.append(f"| {category_cell} | {row.subgroup} | {row.n:,} | {row.mean:.3f} | {row.sd:.3f} |")
+        last_category = row.category
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def write_latex_table(results, overall, output_path, title, subtitle):
+    """Write a category/subgroup table of n, mean, and SD of happiness to a LaTeX file."""
+    lines = [
+        "\\begin{table}[htbp]",
+        "\\centering",
+        f"\\caption{{{title}}}",
+        f"% {subtitle}",
+        "\\begin{tabular}{llrrr}",
+        "\\toprule",
+        "Category & Subgroup & N & Mean & SD \\\\",
+        "\\midrule",
+        f"Overall & Overall & {overall['n']:,} & {overall['mean']:.3f} & {overall['sd']:.3f} \\\\",
+        "\\midrule",
+    ]
+
+    category_order = list(dict.fromkeys(results["category"]))
+    for i, category in enumerate(category_order):
+        sub = results[results["category"] == category]
+        for row in sub.itertuples():
+            lines.append(f"{category} & {row.subgroup} & {row.n:,} & {row.mean:.3f} & {row.sd:.3f} \\\\")
+            category = ""  # only print the category name on the first row of the block
+        if i < len(category_order) - 1:
+            lines.append("\\midrule")
+
+    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 TITLE = "Happiness across U.S. subgroups"
 SUBTITLE = "General Social Survey, 2004-2024; raw survey subgroup means with 95% confidence intervals"
+TABLE_SUBTITLE = "General Social Survey, 2004-2024; raw survey subgroup means and standard deviations"
 
 
 def main():
     df = load_data(INPUT_FILE)
-    results, overall_mean, overall_se = build_results(df)
-    plot_results(results, overall_mean, OUTPUT_FILE, TITLE, SUBTITLE)
-    print(f"Overall average happiness score across the sample: {overall_mean:.3f}")
+    results, overall = build_results(df)
+    plot_results(results, overall["mean"], OUTPUT_FILE, TITLE, SUBTITLE)
+    write_markdown_table(results, overall, OUTPUT_TABLE_MD, TITLE, TABLE_SUBTITLE)
+    write_latex_table(results, overall, OUTPUT_TABLE_TEX, TITLE, TABLE_SUBTITLE)
+
+    print(f"Overall average happiness score across the sample: {overall['mean']:.3f}")
+    overall_se = overall["se"]
+    overall_mean = overall["mean"]
     ci_50 = (overall_mean - 0.674 * overall_se, overall_mean + 0.674 * overall_se)
     ci_75 = (overall_mean - 1.150 * overall_se, overall_mean + 1.150 * overall_se)
     ci_90 = (overall_mean - 1.645 * overall_se, overall_mean + 1.645 * overall_se)
@@ -370,6 +431,7 @@ def main():
     print(f"90% CI: ({ci_90[0]:.3f}, {ci_90[1]:.3f})")
     print(f"95% CI: ({ci_95[0]:.3f}, {ci_95[1]:.3f})")
     print(f"Wrote plot with {len(results)} subgroup rows to {OUTPUT_FILE}")
+    print(f"Wrote tables to {OUTPUT_TABLE_MD} and {OUTPUT_TABLE_TEX}")
 
 
 if __name__ == "__main__":
