@@ -20,9 +20,6 @@ General Social Survey, 2004-2024; WTSSNRPS-weighted subgroup means with design-b
 | Income | Low | 9,583 | 1.968 | 0.009 | (1.949, 1.986) |
 |  | Mid | 8,665 | 2.130 | 0.009 | (2.112, 2.148) |
 |  | High | 7,374 | 2.264 | 0.009 | (2.246, 2.282) |
-| Employment | Employed | 17,153 | 2.152 | 0.006 | (2.139, 2.165) |
-|  | Unemployed | 1,383 | 1.775 | 0.024 | (1.728, 1.822) |
-|  | Not in Labor Force | 10,314 | 2.098 | 0.009 | (2.081, 2.116) |
 | Marital Status | Married | 13,005 | 2.277 | 0.007 | (2.264, 2.291) |
 |  | Widowed | 2,320 | 1.962 | 0.018 | (1.926, 1.997) |
 |  | Separated/Divorced | 5,608 | 1.919 | 0.011 | (1.897, 1.941) |
@@ -45,5 +42,10 @@ General Social Survey, 2004-2024; WTSSNRPS-weighted subgroup means with design-b
 | Socializing with Friends | Never | 2,097 | 1.981 | 0.018 | (1.945, 2.016) |
 |  | Sometimes | 9,743 | 2.135 | 0.008 | (2.119, 2.152) |
 |  | Weekly or more | 7,390 | 2.170 | 0.010 | (2.150, 2.189) |
-| Own or Rent | Own | 12,129 | 2.183 | 0.008 | (2.168, 2.199) |
-|  | Rent | 6,696 | 2.033 | 0.011 | (2.012, 2.055) |
+| Sexual Orientation | Gay/Lesbian/Homosexual | 405 | 2.021 | 0.042 | (1.939, 2.102) |
+|  | Bisexual | 569 | 1.896 | 0.036 | (1.826, 1.966) |
+|  | Heterosexual/Straight | 16,694 | 2.104 | 0.007 | (2.090, 2.117) |
+| Region | Northeast | 4,650 | 2.100 | 0.013 | (2.074, 2.125) |
+|  | Midwest | 6,780 | 2.122 | 0.011 | (2.101, 2.143) |
+|  | South | 11,044 | 2.120 | 0.009 | (2.103, 2.137) |
+|  | West | 6,415 | 2.110 | 0.011 | (2.088, 2.131) |

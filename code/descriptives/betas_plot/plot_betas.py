@@ -85,11 +85,11 @@ def plot_betas(results, output_path, title, subtitle):
     plot_height = max(6, 0.42 * n_rows + 1.5)
     fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
 
-    fig = plt.figure(figsize=(11, fig_height), constrained_layout=True)
+    fig = plt.figure(figsize=(13.6, fig_height), constrained_layout=True)
     gs = fig.add_gridspec(
         2, 2,
         height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
-        width_ratios=[1.4, 2.2],
+        width_ratios=[2.0, 2.5],
         wspace=0.03,
     )
     ax_title = fig.add_subplot(gs[0, :])

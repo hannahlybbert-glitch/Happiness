@@ -31,8 +31,9 @@ sys.path.insert(0, FILE_DIR)
 from plot_style import apply_plot_style, UCHICAGO_MAROON  # noqa: E402
 from GSS_happiness_plot import (  # noqa: E402
     clean_numeric, label_happy, label_age, label_sex, label_race, label_education,
-    label_employment, label_marital_status, label_childs, label_attend, label_party,
-    label_urban, label_health, label_socfrend, label_dwelown, plot_results,
+    label_marital_status, label_childs, label_attend, label_party,
+    label_urban, label_health, label_socfrend, label_sexornt, label_region,
+    plot_results,
 )
 
 INPUT_FILE = os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main.csv")
@@ -124,7 +125,6 @@ def build_results(df):
         ("Race", "RACECEN1", label_race),
         ("Education", "DEGREE", label_education),
         ("Income", "REALINC", lambda s: label_income_weighted(s, df_valid[WEIGHT_COL])),
-        ("Employment", "WRKSTAT", label_employment),
         ("Marital Status", "MARITAL", label_marital_status),
         ("Children Ever Born", "CHILDS", label_childs),
         ("Religious Attendance", "ATTEND", label_attend),
@@ -132,7 +132,8 @@ def build_results(df):
         ("Urban vs Rural", "XNORCSIZ", label_urban),
         ("Health", "HEALTH", label_health),
         ("Socializing with Friends", "SOCFREND", label_socfrend),
-        ("Own or Rent", "DWELOWN", label_dwelown),
+        ("Sexual Orientation", "SEXORNT", label_sexornt),
+        ("Region", "REGION", label_region),
     ]
 
     results = []

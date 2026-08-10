@@ -1,16 +1,17 @@
 """
 Author: Hannah Lybbert, assisted by Claude
 Date created: 2026-07-23
-Last updated: 2026-08-06
+Last updated: 2026-08-10
 Purpose: Filter the raw GSS 1974-2024 file to 2004-2024 and keep only the raw
          variables needed for the descriptive analysis (issue #5). Values are kept
          as their original GSS codes; bucketing/recoding happens in later scripts.
 
-         Also adds DWELOWN_IAP / SOCFREND_IAP / HEALTH_IAP boolean columns (added
-         2026-08-06, per why_N_drop.py + run_betas_regression.R): these three
-         questions are only administered to a rotating subset of respondents each
-         wave, and the raw SAS file distinguishes "Inapplicable" (its 'I' special-
-         missing code, i.e. not administered) from genuine "Don't Know"/"No Answer"/
+         Also adds DWELOWN_IAP / SOCFREND_IAP / HEALTH_IAP / SEXORNT_IAP boolean
+         columns (DWELOWN/SOCFREND/HEALTH added 2026-08-06, SEXORNT added
+         2026-08-10, per why_N_drop.py + run_betas_regression.R): these questions
+         are only administered to a rotating subset of respondents each wave, and
+         the raw SAS file distinguishes "Inapplicable" (its 'I' special-missing
+         code, i.e. not administered) from genuine "Don't Know"/"No Answer"/
          "Skipped" ('D'/'N'/'S'). The default read below collapses all of those to
          plain NaN like every other variable (unchanged behavior, so existing
          consumers of GSS_main.csv aren't affected); the extra columns are a second,
@@ -40,12 +41,12 @@ RAW_VARS = [
     "YEAR", "ID", "HAPPY", "AGE", "SEX", "RACE", "HISPANIC", "RACECEN1", "RACECEN2",
     "RACECEN3", "DEGREE", "REALINC", "INCOME", "WRKSTAT", "MARITAL", "CHILDS", "ATTEND",
     "PARTYID", "XNORCSIZ", "HEALTH", "SOCFREND", "FAMILY16", "FAMDIF16", "DWELOWN",
-    "WTSSNRPS", "VPSU", "VSTRAT",
+    "WTSSNRPS", "VPSU", "VSTRAT", "SEXORNT", "REGION",
 ]
 
 # Ballot/module questions where "not administered" (SAS special-missing code 'I',
 # Inapplicable) should be told apart from genuine nonresponse ('D'/'N'/'S').
-IAP_FLAG_VARS = ["DWELOWN", "SOCFREND", "HEALTH"]
+IAP_FLAG_VARS = ["DWELOWN", "SOCFREND", "HEALTH", "SEXORNT"]
 
 
 def load_data(file_path, usecols):

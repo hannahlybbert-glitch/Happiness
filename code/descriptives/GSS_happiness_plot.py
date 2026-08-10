@@ -162,6 +162,20 @@ def label_dwelown(series):
     return code.map(mapping), labels
 
 
+def label_sexornt(series):
+    code = clean_numeric(series, set())
+    mapping = {1: "Gay/Lesbian/Homosexual", 2: "Bisexual", 3: "Heterosexual/Straight"}
+    labels = ["Gay/Lesbian/Homosexual", "Bisexual", "Heterosexual/Straight"]
+    return code.map(mapping), labels
+
+
+def label_region(series):
+    code = clean_numeric(series, set())
+    mapping = {1: "Northeast", 2: "Midwest", 3: "South", 4: "West"}
+    labels = ["Northeast", "Midwest", "South", "West"]
+    return code.map(mapping), labels
+
+
 # Each spec: (category display name, source column, labeling function)
 SUBGROUP_SPECS = [
     ("Age", "AGE", label_age),
@@ -169,7 +183,6 @@ SUBGROUP_SPECS = [
     ("Race", "RACECEN1", label_race),
     ("Education", "DEGREE", label_education),
     ("Income", "REALINC", label_income),
-    ("Employment", "WRKSTAT", label_employment),
     ("Marital Status", "MARITAL", label_marital_status),
     ("Children Ever Born", "CHILDS", label_childs),
     ("Religious Attendance", "ATTEND", label_attend),
@@ -177,7 +190,8 @@ SUBGROUP_SPECS = [
     ("Urban vs Rural", "XNORCSIZ", label_urban),
     ("Health", "HEALTH", label_health),
     ("Socializing with Friends", "SOCFREND", label_socfrend),
-    ("Own or Rent", "DWELOWN", label_dwelown),
+    ("Sexual Orientation", "SEXORNT", label_sexornt),
+    ("Region", "REGION", label_region),
 ]
 
 
@@ -295,11 +309,11 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
     plot_height = max(6, 0.42 * n_rows + 1.5)
     fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
 
-    fig = plt.figure(figsize=(11, fig_height), constrained_layout=True)
+    fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
     gs = fig.add_gridspec(
         2, 2,
         height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
-        width_ratios=[1.4, 2.2],
+        width_ratios=[1.6, 2.5],
         wspace=0.03,
     )
     ax_title = fig.add_subplot(gs[0, :])

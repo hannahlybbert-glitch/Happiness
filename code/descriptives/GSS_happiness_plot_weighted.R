@@ -87,15 +87,6 @@ label_education <- function(x) {
 }
 EDUCATION_LEVELS <- c("Less than HS", "HS+some college", "Bachelors+Graduate")
 
-label_employment <- function(x) {
-  code <- clean_numeric(x)
-  mapping <- c(`1` = "Employed", `2` = "Employed", `3` = "Employed", `4` = "Unemployed",
-               `5` = "Not in Labor Force", `6` = "Not in Labor Force",
-               `7` = "Not in Labor Force", `8` = "Not in Labor Force")
-  map_values(code, mapping)
-}
-EMPLOYMENT_LEVELS <- c("Employed", "Unemployed", "Not in Labor Force")
-
 label_marital <- function(x) {
   code <- clean_numeric(x)
   mapping <- c(`1` = "Married", `2` = "Widowed", `3` = "Separated/Divorced",
@@ -152,12 +143,19 @@ label_socfrend <- function(x) {
 }
 SOCFREND_LEVELS <- c("Weekly or more", "Sometimes", "Never")
 
-label_dwelown <- function(x) {
+label_sexornt <- function(x) {
   code <- clean_numeric(x)
-  mapping <- c(`1` = "Own", `2` = "Rent")
+  mapping <- c(`1` = "Gay/Lesbian/Homosexual", `2` = "Bisexual", `3` = "Heterosexual/Straight")
   map_values(code, mapping)
 }
-DWELOWN_LEVELS <- c("Own", "Rent")
+SEXORNT_LEVELS <- c("Gay/Lesbian/Homosexual", "Bisexual", "Heterosexual/Straight")
+
+label_region <- function(x) {
+  code <- clean_numeric(x)
+  mapping <- c(`1` = "Northeast", `2` = "Midwest", `3` = "South", `4` = "West")
+  map_values(code, mapping)
+}
+REGION_LEVELS <- c("Northeast", "Midwest", "South", "West")
 
 # (category display name, group column name, level order) - grp columns added to df below
 SUBGROUP_SPECS <- list(
@@ -166,7 +164,6 @@ SUBGROUP_SPECS <- list(
   list(category = "Race", col = "grp_race", levels = RACE_LEVELS),
   list(category = "Education", col = "grp_education", levels = EDUCATION_LEVELS),
   list(category = "Income", col = "grp_income", levels = c("Low", "Mid", "High")),
-  list(category = "Employment", col = "grp_employment", levels = EMPLOYMENT_LEVELS),
   list(category = "Marital Status", col = "grp_marital", levels = MARITAL_LEVELS),
   list(category = "Children Ever Born", col = "grp_childs", levels = CHILDS_LEVELS),
   list(category = "Religious Attendance", col = "grp_attend", levels = ATTEND_LEVELS),
@@ -174,7 +171,8 @@ SUBGROUP_SPECS <- list(
   list(category = "Urban vs Rural", col = "grp_urban", levels = URBAN_LEVELS),
   list(category = "Health", col = "grp_health", levels = HEALTH_LEVELS),
   list(category = "Socializing with Friends", col = "grp_socfrend", levels = SOCFREND_LEVELS),
-  list(category = "Own or Rent", col = "grp_dwelown", levels = DWELOWN_LEVELS)
+  list(category = "Sexual Orientation", col = "grp_sexornt", levels = SEXORNT_LEVELS),
+  list(category = "Region", col = "grp_region", levels = REGION_LEVELS)
 )
 
 # ============================================================================
@@ -190,7 +188,6 @@ df <- df |>
     grp_sex = label_sex(SEX),
     grp_race = label_race(RACECEN1),
     grp_education = label_education(DEGREE),
-    grp_employment = label_employment(WRKSTAT),
     grp_marital = label_marital(MARITAL),
     grp_childs = label_childs(CHILDS),
     grp_attend = label_attend(ATTEND),
@@ -198,7 +195,8 @@ df <- df |>
     grp_urban = label_urban(XNORCSIZ),
     grp_health = label_health(HEALTH),
     grp_socfrend = label_socfrend(SOCFREND),
-    grp_dwelown = label_dwelown(DWELOWN)
+    grp_sexornt = label_sexornt(SEXORNT),
+    grp_region = label_region(REGION)
   )
 
 # Income terciles: simple weight-only quantile cutpoints (not design-based - these are
