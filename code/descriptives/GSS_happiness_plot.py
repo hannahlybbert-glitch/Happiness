@@ -176,6 +176,32 @@ def label_region(series):
     return code.map(mapping), labels
 
 
+def label_tvhours(series):
+    code = clean_numeric(series, set())
+    bins = [-np.inf, 0.5, 1.5, 2.5, 4.5, np.inf]
+    labels = ["0", "1", "2", "3-4", "5+"]
+    return pd.cut(code, bins=bins, labels=labels), labels
+
+
+def label_numpets(series):
+    """DOG/CAT are already 0/1-coded in GSS; NUMPETS is bucketed to match (0 vs 1+)."""
+    code = clean_numeric(series, set())
+    bins = [-np.inf, 0.5, np.inf]
+    labels = ["Does not have", "Has"]
+    return pd.cut(code, bins=bins, labels=labels), labels
+
+
+def label_dog(series):
+    code = clean_numeric(series, set())
+    mapping = {0: "Does not have", 1: "Has"}
+    labels = ["Does not have", "Has"]
+    return code.map(mapping), labels
+
+
+def label_cat(series):
+    return label_dog(series)
+
+
 # Each spec: (category display name, source column, labeling function)
 SUBGROUP_SPECS = [
     ("Age", "AGE", label_age),

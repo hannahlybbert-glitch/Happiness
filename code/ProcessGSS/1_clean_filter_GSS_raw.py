@@ -41,7 +41,8 @@ RAW_VARS = [
     "YEAR", "ID", "HAPPY", "AGE", "SEX", "RACE", "HISPANIC", "RACECEN1", "RACECEN2",
     "RACECEN3", "DEGREE", "REALINC", "INCOME", "WRKSTAT", "MARITAL", "CHILDS", "ATTEND",
     "PARTYID", "XNORCSIZ", "HEALTH", "SOCFREND", "FAMILY16", "FAMDIF16", "DWELOWN",
-    "WTSSNRPS", "VPSU", "VSTRAT", "SEXORNT", "REGION",
+    "WTSSNRPS", "VPSU", "VSTRAT", "SEXORNT", "REGION", "NUMPETS", "DOG", "CAT",
+    "TVHOURS",
 ]
 
 # Ballot/module questions where "not administered" (SAS special-missing code 'I',
