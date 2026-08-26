@@ -33,7 +33,6 @@ from GSS_happiness_plot import (  # noqa: E402
     clean_numeric, label_happy, label_age, label_sex, label_race, label_education,
     label_marital_status, label_childs, label_attend, label_party,
     label_urban, label_health, label_socfrend, label_sexornt, label_region,
-    label_tvhours, label_numpets, label_dog, label_cat,
     plot_results,
 )
 
@@ -135,10 +134,6 @@ def build_results(df):
         ("Socializing with Friends", "SOCFREND", label_socfrend),
         ("Sexual Orientation", "SEXORNT", label_sexornt),
         ("Region", "REGION", label_region),
-        ("TV Hours per Day", "TVHOURS", label_tvhours),
-        ("Number of Pets", "NUMPETS", label_numpets),
-        ("Dog Ownership", "DOG", label_dog),
-        ("Cat Ownership", "CAT", label_cat),
     ]
 
     results = []

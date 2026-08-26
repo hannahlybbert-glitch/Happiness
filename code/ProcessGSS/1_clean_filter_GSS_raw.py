@@ -17,6 +17,10 @@ Purpose: Filter the raw GSS 1974-2024 file to 2004-2024 and keep only the raw
          consumers of GSS_main.csv aren't affected); the extra columns are a second,
          narrow read with pyreadstat's user_missing=True just to recover which NaNs
          were specifically "not administered", merged in by (ID, YEAR).
+
+         Also splits GSS_main.csv into two non-overlapping era files (GSS_main_04_13.csv,
+         GSS_main_14_24.csv) for era-comparison plots - just a YEAR filter of the same
+         data already in memory, no second SAS read.
 """
 
 import os
@@ -35,6 +39,12 @@ OUTPUT_FILE = os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main.csv")
 
 MIN_YEAR = 2004
 MAX_YEAR = 2024
+
+# Non-overlapping eras for the era-comparison plots (issue: 2004-2013 vs 2014-2024 happiness).
+ERA_SPLITS = [
+    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_04_13.csv"), 2004, 2013),
+    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_14_24.csv"), 2014, 2024),
+]
 
 # Raw columns to pull from the (2.4GB, ~6900-column) SAS file, per issue #5.
 RAW_VARS = [
@@ -94,6 +104,11 @@ def main():
 
     save_data(df_out, OUTPUT_FILE)
     print(f"Wrote {len(df_out)} rows and {len(df_out.columns)} columns to {OUTPUT_FILE}")
+
+    for era_path, era_min, era_max in ERA_SPLITS:
+        era_df = filter_years(df_out, era_min, era_max)
+        save_data(era_df, era_path)
+        print(f"Wrote {len(era_df)} rows (YEAR {era_min}-{era_max}) to {era_path}")
 
 
 if __name__ == "__main__":
