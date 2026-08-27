@@ -18,9 +18,10 @@ Purpose: Filter the raw GSS 1974-2024 file to 2004-2024 and keep only the raw
          narrow read with pyreadstat's user_missing=True just to recover which NaNs
          were specifically "not administered", merged in by (ID, YEAR).
 
-         Also splits GSS_main.csv into two non-overlapping era files (GSS_main_04_13.csv,
-         GSS_main_14_24.csv) for era-comparison plots - just a YEAR filter of the same
-         data already in memory, no second SAS read.
+         Also splits GSS_main.csv into four non-overlapping ~5-year period files
+         (GSS_main_04_08.csv, GSS_main_09_13.csv, GSS_main_14_18.csv,
+         GSS_main_19_24.csv) for period-comparison plots - just a YEAR filter of the
+         same data already in memory, no second SAS read.
 """
 
 import os
@@ -40,10 +41,12 @@ OUTPUT_FILE = os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main.csv")
 MIN_YEAR = 2004
 MAX_YEAR = 2024
 
-# Non-overlapping eras for the era-comparison plots (issue: 2004-2013 vs 2014-2024 happiness).
+# Non-overlapping ~5-year periods for the period-comparison plots.
 ERA_SPLITS = [
-    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_04_13.csv"), 2004, 2013),
-    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_14_24.csv"), 2014, 2024),
+    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_04_08.csv"), 2004, 2008),
+    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_09_13.csv"), 2009, 2013),
+    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_14_18.csv"), 2014, 2018),
+    (os.path.join(PROJECT_ROOT, "data", "ProcessGSS", "GSS_main_19_24.csv"), 2019, 2024),
 ]
 
 # Raw columns to pull from the (2.4GB, ~6900-column) SAS file, per issue #5.
