@@ -296,8 +296,13 @@ def wrap_two_lines(text):
 TITLE_BLOCK_HEIGHT_IN = 0.9  # inches reserved for the title + subtitle row
 
 
-def plot_results(results, overall_mean, output_path, title, subtitle):
-    """Draw one point + 95% CI per subgroup, grouped into category blocks, and save to output_path."""
+def plot_results(results, overall_mean, output_path, title, subtitle, show_title=True, xlim=None):
+    """Draw one point + 95% CI per subgroup, grouped into category blocks, and save to output_path.
+
+    show_title=False omits the title/subtitle block entirely (for spliced sub-plots that share
+    a single title elsewhere). xlim fixes the x-axis range explicitly (e.g. so a set of spliced
+    plots all share the same scale instead of each autoscaling to its own subset of categories).
+    """
     apply_plot_style()
 
     category_order = list(dict.fromkeys(results["category"]))
@@ -333,24 +338,31 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
 
     n_rows = len(results)
     plot_height = max(6, 0.42 * n_rows + 1.5)
-    fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
 
-    fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
-    gs = fig.add_gridspec(
-        2, 2,
-        height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
-        width_ratios=[1.6, 2.5],
-        wspace=0.03,
-    )
-    ax_title = fig.add_subplot(gs[0, :])
-    ax_label = fig.add_subplot(gs[1, 0])
-    ax_plot = fig.add_subplot(gs[1, 1], sharey=ax_label)
+    if show_title:
+        fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
+        fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
+        gs = fig.add_gridspec(
+            2, 2,
+            height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
+            width_ratios=[1.6, 2.5],
+            wspace=0.03,
+        )
+        ax_title = fig.add_subplot(gs[0, :])
+        ax_label = fig.add_subplot(gs[1, 0])
+        ax_plot = fig.add_subplot(gs[1, 1], sharey=ax_label)
 
-    ax_title.text(0.5, 0.68, title, transform=ax_title.transAxes,
-                  ha="center", va="center", fontsize=20)
-    ax_title.text(0.5, 0.22, subtitle, transform=ax_title.transAxes,
-                  ha="center", va="center", fontsize=11, color="dimgray")
-    ax_title.axis("off")
+        ax_title.text(0.5, 0.68, title, transform=ax_title.transAxes,
+                      ha="center", va="center", fontsize=20)
+        ax_title.text(0.5, 0.22, subtitle, transform=ax_title.transAxes,
+                      ha="center", va="center", fontsize=11, color="dimgray")
+        ax_title.axis("off")
+    else:
+        fig_height = plot_height
+        fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
+        gs = fig.add_gridspec(1, 2, width_ratios=[1.6, 2.5], wspace=0.03)
+        ax_label = fig.add_subplot(gs[0, 0])
+        ax_plot = fig.add_subplot(gs[0, 1], sharey=ax_label)
 
     # --- Label panel: darker gray category strip (vertical text) + lighter gray subgroup box ---
     ax_label.set_xlim(0, 1)
@@ -390,6 +402,8 @@ def plot_results(results, overall_mean, output_path, title, subtitle):
         ax_plot.axhline(boundary, linestyle=":", linewidth=0.8, color="#888888")
 
     ax_plot.set_ylim(y_lo, y_hi)
+    if xlim is not None:
+        ax_plot.set_xlim(xlim)
     ax_plot.tick_params(labelleft=False, left=False)
     ax_plot.grid(axis="y", visible=False)
     ax_plot.set_xlabel("Average Happiness Score (1=Not too happy, 2=Pretty happy, 3=Very happy)")
