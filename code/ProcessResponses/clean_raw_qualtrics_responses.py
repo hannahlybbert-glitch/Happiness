@@ -19,10 +19,14 @@ from plot_style import apply_plot_style, UCHICAGO_MAROON  # noqa: E402
 
 RAW_FILE = os.path.join(
     PROJECT_ROOT, "raw", "Qualtrics_Responses",
-    "Happiness_September+3,+2026_12.06.csv",
+    "Happiness_September+14,+2026_15.52.csv",
 )
 RELABEL_FILE = os.path.join(
     PROJECT_ROOT, "raw", "Qualtrics_Responses", "relabeling_responses.csv"
+)
+PROLIFIC_FILE = os.path.join(
+    PROJECT_ROOT, "raw", "Prolific_IDs",
+    "prolific_demographic_export_6a91a000fb8289c422736eb0.csv",
 )
 OUTPUT_FILE = os.path.join(
     PROJECT_ROOT, "data", "Qualtrics_Responses", "cleaned_qualtrics_responses.csv"
@@ -36,6 +40,15 @@ ATTENTION_CHECK_PLOT = os.path.join(
 # header), row 2 is the full question text, and row 3 is the ImportId metadata.
 # Skip rows 2-3 so only the variable names are kept as column names.
 df = pd.read_csv(RAW_FILE, skiprows=[1, 2])
+
+# Drop everything recorded before the survey's actual Prolific launch, first thing,
+# so every count/report below already reflects only the real fielding period. This
+# also removes every preview/test response from developing the survey (all 13 of
+# them started well before this cutoff).
+df["StartDate"] = pd.to_datetime(df["StartDate"])
+START_CUTOFF = pd.Timestamp("2026-09-02 14:00:00")
+df = df[df["StartDate"] >= START_CUTOFF]
+
 print(f"Raw responses received: {len(df)}")
 print(f"Distinct authors received: {df['ResponseId'].nunique()}")
 
@@ -58,16 +71,44 @@ DROP_COLS = [
 ]
 df = df.drop(columns=DROP_COLS)
 
-# Parse StartDate/EndDate as datetimes (both come in as strings from Qualtrics)
-# so they can be filtered/subtracted, e.g. total fieldwork time = the latest
-# EndDate minus the earliest StartDate.
-df["StartDate"] = pd.to_datetime(df["StartDate"])
-df["EndDate"] = pd.to_datetime(df["EndDate"])
+# First cleaning step, ahead of everything else (including the attention-check
+# descriptives below): match each response to its Prolific submission via the
+# PROLIFIC_PID Qualtrics captured from the study URL, matched against "Participant
+# id" in Prolific's own export, and keep only responses Prolific itself marked
+# APPROVED. Rows with no Prolific match at all (blank/unrecognized PROLIFIC_PID -
+# e.g. the pre-launch preview/test rows) end up with a blank PROLIFIC_STATUS and are
+# dropped the same as an explicit REJECTED/RETURNED/TIMED-OUT. Also drop the two
+# known bots, which ARE status APPROVED but flagged "low" on Prolific's own
+# "Authenticity check: Bots" field.
+prolific = pd.read_csv(PROLIFIC_FILE)[
+    ["Participant id", "Status", "Authenticity check: Bots"]
+].rename(columns={
+    "Participant id": "PROLIFIC_ID",
+    "Status": "PROLIFIC_STATUS",
+    "Authenticity check: Bots": "PROLIFIC_BOT_CHECK",
+})
+n_before_prolific = len(df)
+df = df.merge(prolific, left_on="PROLIFIC_PID", right_on="PROLIFIC_ID", how="left")
+n_not_approved = int((df["PROLIFIC_STATUS"] != "APPROVED").sum())
+print(
+    f"Dropping {n_not_approved} of {n_before_prolific} responses without "
+    "PROLIFIC_STATUS == 'APPROVED' (no Prolific match, or Prolific status "
+    "REJECTED/RETURNED/TIMED-OUT/etc.)"
+)
+df = df[df["PROLIFIC_STATUS"] == "APPROVED"]
 
-# Pre-survey decluttering: drop responses recorded before the survey officially
-# launched, and preview/test submissions that aren't part of the true survey.
-START_CUTOFF = pd.Timestamp("2026-09-02 14:03:00")
-df = df[(df["StartDate"] >= START_CUTOFF) & (df["Status"] != "Survey Preview")]
+n_before_bot_check = len(df)
+n_bots = int((df["PROLIFIC_BOT_CHECK"] == "low").sum())
+print(
+    f"Dropping {n_bots} of {n_before_bot_check} approved responses flagged "
+    "PROLIFIC_BOT_CHECK == 'low'"
+)
+df = df[df["PROLIFIC_BOT_CHECK"] != "low"]
+
+# Parse EndDate as a datetime too (StartDate already was, above), so both can be
+# filtered/subtracted, e.g. total fieldwork time = the latest EndDate minus the
+# earliest StartDate.
+df["EndDate"] = pd.to_datetime(df["EndDate"])
 
 # Attention checks. Report the count and share of total failing each check
 # individually, then drop any response that fails at least one.
@@ -110,10 +151,22 @@ plt.close(fig)
 print(f"Saved attention check failure chart to {ATTENTION_CHECK_PLOT}")
 
 fails_any_check = pd.concat(attention_checks.values(), axis=1).any(axis=1)
+n_fail_any = int(fails_any_check.sum())
+print(
+    f"Unique respondents failing at least one attention check: {n_fail_any} "
+    f"({n_fail_any / n_total:.1%})"
+)
 df = df[~fails_any_check]
 
-# TODO: remember to drop the two bots that were detected, the 11 timed-out, and the 40 returned responses.
-# will need to use time-stamp matching
+# After all the dropping above, the same Prolific participant can still appear more
+# than once (e.g. a retry after a connection issue) - keep only the response they
+# started first.
+n_before_dedup = len(df)
+df = df.sort_values("StartDate").drop_duplicates(subset="PROLIFIC_ID", keep="first")
+n_dupes = n_before_dedup - len(df)
+print(f"Dropping {n_dupes} duplicate responses (same PROLIFIC_ID, keeping earliest StartDate)")
+
+assert df["PROLIFIC_ID"].is_unique, "PROLIFIC_ID should be unique after dedup"
 
 # Recode respondent_happy from text to an ordered 1-3 scale.
 HAPPY_MAP = {
@@ -164,3 +217,6 @@ print(
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 df.to_csv(OUTPUT_FILE, index=False)
 print(f"Saved cleaned data to {OUTPUT_FILE}")
+
+n_analysis = df["PROLIFIC_ID"].nunique()
+print(f"Analysis N (unique respondents kept): {n_analysis}")
