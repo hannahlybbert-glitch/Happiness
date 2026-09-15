@@ -46,6 +46,17 @@ OUTPUT_FILE = os.path.join(OUTPUT_DIR, "GSS_happiness_truth.png")
 OUTPUT_TABLE_MD = os.path.join(OUTPUT_DIR, "GSS_happiness_truth.md")
 OUTPUT_TABLE_TEX = os.path.join(OUTPUT_DIR, "GSS_happiness_truth.tex")
 
+# Slide-sized spliced versions of the same plot: 14 categories split 5/5/4, no title,
+# same x-axis scale, and the same LHS label formatting as the full plot.
+SPLICE_GROUPS = [
+    ["Age", "Gender", "Race", "Education", "Income"],
+    ["Marital Status", "Children Ever Born", "Religious Attendance", "Party", "Urban vs Rural"],
+    ["Health", "Socializing with Friends", "Sexual Orientation", "Region"],
+]
+SPLICE_OUTPUT_FILES = [
+    os.path.join(OUTPUT_DIR, f"GSS_happiness_truth_part{i}.png") for i in range(1, len(SPLICE_GROUPS) + 1)
+]
+
 WEIGHT_COL = "WTSSNRPS"
 PSU_COL = "VPSU"
 STRAT_COL = "VSTRAT"
@@ -234,10 +245,32 @@ SUBTITLE = ("General Social Survey, 2004-2024; WTSSNRPS-weighted subgroup means 
             "95% CIs (VPSU/VSTRAT)")
 
 
+def shared_xlim(results, overall_mean, pad_frac=0.05):
+    """x-axis range covering every category's CI (plus the overall-mean line), with the same
+    5% padding matplotlib's default autoscale would add - so all spliced plots share one scale
+    matching what the full, unsplit plot would show."""
+    lo = min(results["ci_lo"].min(), overall_mean)
+    hi = max(results["ci_hi"].max(), overall_mean)
+    pad = (hi - lo) * pad_frac
+    return (lo - pad, hi + pad)
+
+
+def plot_spliced(results, overall_mean):
+    """Save the slide-sized spliced versions: same category groups, no title, shared x-scale,
+    same LHS label formatting as the full plot."""
+    xlim = shared_xlim(results, overall_mean)
+    for categories, output_file in zip(SPLICE_GROUPS, SPLICE_OUTPUT_FILES):
+        subset = results[results["category"].isin(categories)]
+        plot_results(subset, overall_mean, output_file, title=None, subtitle=None,
+                     show_title=False, xlim=xlim)
+        print(f"Wrote spliced plot with {len(subset)} subgroup rows to {output_file}")
+
+
 def main():
     df = load_data(INPUT_FILE)
     results, overall = build_results(df)
     plot_results(results, overall["mean"], OUTPUT_FILE, TITLE, SUBTITLE)
+    plot_spliced(results, overall["mean"])
     write_markdown_table(results, overall, OUTPUT_TABLE_MD, TITLE, SUBTITLE)
     write_latex_table(results, overall, OUTPUT_TABLE_TEX, TITLE, SUBTITLE)
 
