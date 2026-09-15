@@ -1,0 +1,268 @@
+# Author: Hannah Lybbert, assisted by Claude
+# Created: 2026-08-04; Updated: 2026-09-14
+# Purpose: Multiple regression of HAPPY on 14 demographic/attitudinal subgroup blocks
+#   (dummy-coded, one omitted baseline per block) plus survey-year fixed effects, using
+#   the 2004-2024 GSS. WLS (WTSSNRPS) with cluster-robust (CR1 sandwich, clustered by
+#   VSTRAT x VPSU) standard errors, computed directly in base R matrix algebra - no
+#   extra R packages beyond `here`, avoiding the Matrix/survey Windows/mingw issue that
+#   blocked GSS_happiness_plot_weighted.R.
+#
+#   code/analysis/ copy of code/descriptives/betas_plot/run_betas_regression.R: identical
+#   regression, writes to its own data/analysis/betas_plot/GSS_betas.csv so the
+#   code/analysis/betas_plot/plot_betas.py splicing changes stay independent of the
+#   descriptives copy.
+#
+# Baselines (confirmed with PI 2026-08-04, updated 2026-08-10): 35-64, Woman, White,
+#   HS+some college, Mid income, Married, No Children, Sometimes attendance, Independent,
+#   Suburb, Good health, Sometimes socializing, Heterosexual/Straight, South. Year fixed
+#   effects reference 2004. (Employment and Own or Rent blocks were dropped 2026-08-10;
+#   Sexual Orientation and Region added in their place.)
+#
+# "Not Asked" dummy levels (added 2026-08-06, per why_N_drop.py findings; extended
+#   2026-08-10 to Sexual Orientation): Socializing with Friends (SOCFREND), Health
+#   (HEALTH), and Sexual Orientation (SEXORNT) are each missing for a large, wave-varying
+#   share of respondents (SOCFREND/HEALTH ~33% through 2018, dropping to ~0.2% from 2021
+#   on; SEXORNT ~44% overall, see GSS_sexornt_coverage.md) - a GSS ballot/module question
+#   not asked of the full sample, not genuine nonresponse. Plain complete.cases() would
+#   drop anyone missing on any of the 14 blocks, and these heavily-missing variables alone
+#   would account for most of that loss. SOCFREND_IAP/HEALTH_IAP/SEXORNT_IAP (from
+#   1_clean_filter_GSS_raw.py, sourced from the raw SAS file's 'I' = Inapplicable
+#   special-missing code) identify exactly who wasn't administered the question, as
+#   opposed to genuine Don't Know/No Answer/Skipped - only the former get recoded to an
+#   explicit "Not Asked" factor level, fit as its own dummy for all three variables, and
+#   reported/plotted as its own subgroup row like any other level (so those respondents
+#   both inform the other categories' estimates and show up as their own point in the
+#   output). The latter (genuine Don't Know/No Answer/Skipped) is still NA and still
+#   excluded by complete.cases(), same as before.
+#
+#   (Through 2026-08-10, Socializing with Friends shared its ballot module with Own or
+#   Rent (DWELOWN) - the two variables' "Not Asked" respondents were the identical set of
+#   people, so fitting independent "Not Asked" dummies for both produced an exactly
+#   singular design matrix, and SOCFREND's had to collapse into its "Sometimes" baseline
+#   for fitting instead. Now that DWELOWN is dropped from the model entirely, that
+#   collinearity is gone and SOCFREND gets its own independent "Not Asked" dummy like
+#   HEALTH and SEXORNT.)
+#
+# Requires: data/ProcessGSS/GSS_main.csv (must include WTSSNRPS, VPSU, VSTRAT, and
+#   SEXORNT_IAP - re-run code/ProcessGSS/1_clean_filter_GSS_raw.py if SEXORNT_IAP is
+#   missing from that file).
+# Packages: install.packages("here")
+#
+# Outputs: data/analysis/betas_plot/GSS_betas.csv (category, subgroup, beta, se,
+#   ci_lo, ci_hi, n - one row per non-baseline subgroup level, for
+#   code/analysis/betas_plot/plot_betas.py to read and plot).
+
+suppressPackageStartupMessages(library(here))
+
+INPUT_FILE <- here::here("data", "ProcessGSS", "GSS_main.csv")
+OUTPUT_CSV <- here::here("data", "analysis", "betas_plot", "GSS_betas.csv")
+
+# ============================================================================
+# RECODING (same buckets as GSS_happiness_plot.py / GSS_happiness_plot_weighted.R,
+# but returned as factors with the confirmed baseline level listed FIRST, so
+# model.matrix()'s default treatment contrasts drop the right reference level.)
+# ============================================================================
+
+clean_numeric <- function(x, exclude = numeric(0)) {
+  x <- suppressWarnings(as.numeric(x))
+  x[x %in% exclude] <- NA
+  x
+}
+
+map_values <- function(code, mapping) unname(mapping[as.character(code)])
+
+make_factor <- function(labels, level_order) factor(labels, levels = level_order)
+
+# Recode to an explicit "Not Asked" level (instead of NA) wherever iap is TRUE, so
+# respondents who simply weren't administered a ballot-rotation question aren't
+# dropped by complete.cases() downstream. Non-IAP missingness (Don't Know/No
+# Answer/Skipped) is left as NA and still excluded, same as before.
+flag_not_asked <- function(labels, iap) ifelse(iap, "Not Asked", labels)
+
+weighted_quantile <- function(x, w, probs) {
+  keep <- !is.na(x) & !is.na(w)
+  x <- x[keep]; w <- w[keep]
+  ord <- order(x)
+  x <- x[ord]; w <- w[ord]
+  cum_w <- cumsum(w) / sum(w)
+  vapply(probs, function(p) x[which(cum_w >= p)[1]], numeric(1))
+}
+
+df <- read.csv(INPUT_FILE, stringsAsFactors = FALSE)
+
+# pandas writes booleans as "True"/"False" text; convert to logical.
+df$SOCFREND_IAP <- df$SOCFREND_IAP == "True"
+df$HEALTH_IAP <- df$HEALTH_IAP == "True"
+df$SEXORNT_IAP <- df$SEXORNT_IAP == "True"
+
+happy_map <- c(`1` = "3", `2` = "2", `3` = "1")
+df$happy <- as.numeric(map_values(clean_numeric(df$HAPPY), happy_map))
+
+age_cut <- cut(clean_numeric(df$AGE), breaks = c(0, 34, 64, Inf), labels = c("18-34", "35-64", "65+"))
+df$age_f <- make_factor(as.character(age_cut), c("35-64", "18-34", "65+"))
+
+df$sex_f <- make_factor(map_values(clean_numeric(df$SEX), c(`1` = "Man", `2` = "Woman")),
+                         c("Woman", "Man"))
+
+race_map <- c(`1` = "White", `2` = "Black", `16` = "Hispanic",
+              `4` = "Asian", `5` = "Asian", `6` = "Asian", `7` = "Asian",
+              `8` = "Asian", `9` = "Asian", `10` = "Asian")
+df$race_f <- make_factor(map_values(clean_numeric(df$RACECEN1), race_map),
+                          c("White", "Black", "Hispanic", "Asian"))
+
+educ_map <- c(`0` = "Less than HS", `1` = "HS+some college", `2` = "HS+some college",
+              `3` = "Bachelors+Graduate", `4` = "Bachelors+Graduate")
+df$educ_f <- make_factor(map_values(clean_numeric(df$DEGREE), educ_map),
+                          c("HS+some college", "Less than HS", "Bachelors+Graduate"))
+
+income_cuts <- weighted_quantile(df$REALINC, df$WTSSNRPS, c(1 / 3, 2 / 3))
+cat(sprintf("Income tercile cutpoints (weighted, REALINC): %.2f, %.2f\n", income_cuts[1], income_cuts[2]))
+income_cut <- cut(clean_numeric(df$REALINC), breaks = c(-Inf, income_cuts, Inf),
+                   labels = c("Low", "Mid", "High"))
+df$income_f <- make_factor(as.character(income_cut), c("Mid", "Low", "High"))
+
+marital_map <- c(`1` = "Married", `2` = "Widowed", `3` = "Separated/Divorced",
+                  `4` = "Separated/Divorced", `5` = "Never Married")
+df$marital_f <- make_factor(map_values(clean_numeric(df$MARITAL), marital_map),
+                             c("Married", "Widowed", "Separated/Divorced", "Never Married"))
+
+childs_code <- clean_numeric(df$CHILDS)
+childs_lab <- ifelse(is.na(childs_code), NA_character_, ifelse(childs_code == 0, "No Children", "Children"))
+df$childs_f <- make_factor(childs_lab, c("No Children", "Children"))
+
+attend_map <- c(`0` = "Never", `1` = "Sometimes", `2` = "Sometimes", `3` = "Sometimes",
+                 `4` = "Sometimes", `5` = "Sometimes", `6` = "Sometimes",
+                 `7` = "Weekly or more", `8` = "Weekly or more")
+df$attend_f <- make_factor(map_values(clean_numeric(df$ATTEND), attend_map),
+                            c("Sometimes", "Never", "Weekly or more"))
+
+party_map <- c(`0` = "Democrat", `1` = "Democrat", `2` = "Democrat", `3` = "Independent",
+               `4` = "Republican", `5` = "Republican", `6` = "Republican")
+df$party_f <- make_factor(map_values(clean_numeric(df$PARTYID), party_map),
+                           c("Independent", "Democrat", "Republican"))
+
+urban_map <- c(`1` = "Big city", `2` = "Big city",
+               `3` = "Suburb", `4` = "Suburb", `5` = "Suburb", `6` = "Suburb",
+               `7` = "Small/rural town", `8` = "Small/rural town",
+               `9` = "Small/rural town", `10` = "Small/rural town")
+df$urban_f <- make_factor(map_values(clean_numeric(df$XNORCSIZ), urban_map),
+                           c("Suburb", "Big city", "Small/rural town"))
+
+health_map <- c(`1` = "Excellent", `2` = "Good", `3` = "Fair", `4` = "Poor")
+df$health_f <- make_factor(
+  flag_not_asked(map_values(clean_numeric(df$HEALTH), health_map), df$HEALTH_IAP),
+  c("Good", "Excellent", "Fair", "Poor", "Not Asked")
+)
+
+socfrend_map <- c(`1` = "Weekly or more", `2` = "Weekly or more", `3` = "Weekly or more",
+                   `4` = "Sometimes", `5` = "Sometimes", `6` = "Sometimes", `7` = "Never")
+df$socfrend_f <- make_factor(
+  flag_not_asked(map_values(clean_numeric(df$SOCFREND), socfrend_map), df$SOCFREND_IAP),
+  c("Sometimes", "Weekly or more", "Never", "Not Asked")
+)
+
+sexornt_map <- c(`3` = "Heterosexual/Straight", `1` = "Gay/Lesbian/Homosexual", `2` = "Bisexual")
+df$sexornt_f <- make_factor(
+  flag_not_asked(map_values(clean_numeric(df$SEXORNT), sexornt_map), df$SEXORNT_IAP),
+  c("Heterosexual/Straight", "Gay/Lesbian/Homosexual", "Bisexual", "Not Asked")
+)
+
+region_map <- c(`1` = "Northeast", `2` = "Midwest", `3` = "South", `4` = "West")
+df$region_f <- make_factor(map_values(clean_numeric(df$REGION), region_map),
+                            c("South", "Northeast", "Midwest", "West"))
+
+df$year_f <- factor(df$YEAR, levels = sort(unique(df$YEAR)))  # reference = 2004, earliest year
+
+# Category display name -> column, used for both fitting and reporting. Health,
+# Socializing with Friends, and Sexual Orientation each carry their own independent
+# "Not Asked" level (see header) - no separate model/reporting split needed.
+CATEGORY_COLS <- list(
+  "Age" = "age_f", "Gender" = "sex_f", "Race" = "race_f", "Education" = "educ_f",
+  "Income" = "income_f", "Marital Status" = "marital_f",
+  "Children Ever Born" = "childs_f", "Religious Attendance" = "attend_f",
+  "Party" = "party_f", "Urban vs Rural" = "urban_f", "Health" = "health_f",
+  "Socializing with Friends" = "socfrend_f", "Sexual Orientation" = "sexornt_f",
+  "Region" = "region_f"
+)
+
+# ============================================================================
+# COMPLETE-CASE SAMPLE
+# ============================================================================
+
+model_vars <- c("happy", unlist(CATEGORY_COLS), "year_f", "WTSSNRPS", "VPSU", "VSTRAT")
+complete <- stats::complete.cases(df[, model_vars])
+df_reg <- df[complete, ]
+cat(sprintf("Complete-case regression sample: %d of %d respondents\n", nrow(df_reg), nrow(df)))
+
+# ============================================================================
+# WLS REGRESSION
+# ============================================================================
+
+form <- as.formula(paste("happy ~", paste(c(unlist(CATEGORY_COLS), "year_f"), collapse = " + ")))
+fit <- lm(form, data = df_reg, weights = WTSSNRPS)
+
+X <- model.matrix(fit)
+w <- df_reg$WTSSNRPS
+u <- residuals(fit)
+cluster <- interaction(df_reg$VSTRAT, df_reg$VPSU, drop = TRUE)
+
+# ============================================================================
+# CLUSTER-ROBUST (CR1 SANDWICH) STANDARD ERRORS, CLUSTERED BY VSTRAT x VPSU
+# ============================================================================
+
+cluster_robust_se <- function(X, w, u, cluster) {
+  XtWX_inv <- solve(t(X) %*% (X * w))
+  score <- X * (w * u)
+  ug <- rowsum(score, cluster)
+  meat <- t(ug) %*% ug
+  G <- nrow(ug)
+  N <- nrow(X)
+  K <- ncol(X)
+  correction <- (G / (G - 1)) * ((N - 1) / (N - K))
+  vcov <- XtWX_inv %*% meat %*% XtWX_inv * correction
+  sqrt(diag(vcov))
+}
+
+se <- cluster_robust_se(X, w, u, cluster)
+names(se) <- colnames(X)
+beta <- coef(fit)
+
+cat(sprintf("\nIntercept (baseline combination, predicted happiness): %.3f (SE %.3f)\n",
+            beta["(Intercept)"], se["(Intercept)"]))
+
+# ============================================================================
+# BUILD OUTPUT TABLE (14 subgroup categories only - year FE kept in the model as
+# controls but not reported in the plot)
+# ============================================================================
+
+rows <- list()
+for (category in names(CATEGORY_COLS)) {
+  col <- CATEGORY_COLS[[category]]
+
+  # Baseline row first (beta = 0 by definition, no CI - it's the reference, not an
+  # estimated contrast), so Python doesn't need its own hardcoded baseline list.
+  baseline_level <- levels(df_reg[[col]])[1]
+  rows[[length(rows) + 1]] <- data.frame(
+    category = category, subgroup = baseline_level, n = sum(df_reg[[col]] == baseline_level, na.rm = TRUE),
+    beta = 0, se = NA, ci_lo = NA, ci_hi = NA, is_baseline = TRUE, stringsAsFactors = FALSE
+  )
+
+  term_prefix <- col
+  term_names <- grep(paste0("^", term_prefix), names(beta), value = TRUE)
+  for (term in term_names) {
+    subgroup <- sub(term_prefix, "", term)
+    n <- sum(df_reg[[col]] == subgroup, na.rm = TRUE)
+    rows[[length(rows) + 1]] <- data.frame(
+      category = category, subgroup = subgroup, n = n,
+      beta = beta[[term]], se = se[[term]],
+      ci_lo = beta[[term]] - 1.96 * se[[term]],
+      ci_hi = beta[[term]] + 1.96 * se[[term]],
+      is_baseline = FALSE, stringsAsFactors = FALSE
+    )
+  }
+}
+results <- do.call(rbind, rows)
+
+dir.create(dirname(OUTPUT_CSV), recursive = TRUE, showWarnings = FALSE)
+write.csv(results, OUTPUT_CSV, row.names = FALSE)
+cat(sprintf("\nWrote %d subgroup betas to %s\n", nrow(results), OUTPUT_CSV))
