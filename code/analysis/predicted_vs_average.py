@@ -35,6 +35,18 @@ OUTPUT_FILE = os.path.join(PROJECT_ROOT, "output", "analysis", "predicted_vs_act
 OUTPUT_TABLE_MD = os.path.join(OUTPUT_DIR, "predicted_vs_actual_happiness_table.md")
 OUTPUT_TABLE_TEX = os.path.join(OUTPUT_DIR, "predicted_vs_actual_happiness_table.tex")
 
+# Slide-sized spliced versions of the same plot: 14 categories split 5/5/4, no title,
+# same x-axis scale, and the same LHS label formatting as the full plot.
+SPLICE_GROUPS = [
+    ["Age", "Gender", "Race", "Education", "Income"],
+    ["Marital Status", "Children Ever Born", "Religious Attendance", "Party", "Urban vs Rural"],
+    ["Health", "Socializing with Friends", "Sexual Orientation", "Region"],
+]
+SPLICE_OUTPUT_FILES = [
+    os.path.join(PROJECT_ROOT, "output", "analysis", f"predicted_vs_actual_happiness_part{i}.png")
+    for i in range(1, len(SPLICE_GROUPS) + 1)
+]
+
 ACTUAL_COLOR = "#E69F00"     # orange - true GSS subgroup average (weighted)
 PREDICTED_COLOR = "#D62728"  # red - survey-predicted subgroup average (unweighted)
 
@@ -160,10 +172,16 @@ def order_subgroups_by_actual_happiness(results):
     return results
 
 
-def plot_comparison_results(results, overall_mean, output_path, title, subtitle):
+def plot_comparison_results(results, overall_mean, output_path, title, subtitle,
+                             show_title=True, xlim=None):
     """Same layout as GSS_happiness_plot.plot_results, but with two points per
     subgroup row: an orange circle (actual, weighted GSS average) and a red square
-    (predicted, unweighted survey average), each with its own 95% CI."""
+    (predicted, unweighted survey average), each with its own 95% CI.
+
+    show_title=False omits the title/subtitle block (for spliced sub-plots that share
+    a single title elsewhere). xlim fixes the x-axis range explicitly so a set of
+    spliced plots all share the same scale instead of each autoscaling on its own.
+    """
     apply_plot_style()
 
     category_order = list(dict.fromkeys(results["category"]))
@@ -197,24 +215,31 @@ def plot_comparison_results(results, overall_mean, output_path, title, subtitle)
 
     n_rows = len(results)
     plot_height = max(6, 0.42 * n_rows + 1.5)
-    fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
 
-    fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
-    gs = fig.add_gridspec(
-        2, 2,
-        height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
-        width_ratios=[1.6, 2.5],
-        wspace=0.03,
-    )
-    ax_title = fig.add_subplot(gs[0, :])
-    ax_label = fig.add_subplot(gs[1, 0])
-    ax_plot = fig.add_subplot(gs[1, 1], sharey=ax_label)
+    if show_title:
+        fig_height = plot_height + TITLE_BLOCK_HEIGHT_IN
+        fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
+        gs = fig.add_gridspec(
+            2, 2,
+            height_ratios=[TITLE_BLOCK_HEIGHT_IN, plot_height],
+            width_ratios=[1.6, 2.5],
+            wspace=0.03,
+        )
+        ax_title = fig.add_subplot(gs[0, :])
+        ax_label = fig.add_subplot(gs[1, 0])
+        ax_plot = fig.add_subplot(gs[1, 1], sharey=ax_label)
 
-    ax_title.text(0.5, 0.68, title, transform=ax_title.transAxes,
-                  ha="center", va="center", fontsize=20)
-    ax_title.text(0.5, 0.22, subtitle, transform=ax_title.transAxes,
-                  ha="center", va="center", fontsize=11, color="dimgray")
-    ax_title.axis("off")
+        ax_title.text(0.5, 0.68, title, transform=ax_title.transAxes,
+                      ha="center", va="center", fontsize=20)
+        ax_title.text(0.5, 0.22, subtitle, transform=ax_title.transAxes,
+                      ha="center", va="center", fontsize=11, color="dimgray")
+        ax_title.axis("off")
+    else:
+        fig_height = plot_height
+        fig = plt.figure(figsize=(12.5, fig_height), constrained_layout=True)
+        gs = fig.add_gridspec(1, 2, width_ratios=[1.6, 2.5], wspace=0.03)
+        ax_label = fig.add_subplot(gs[0, 0])
+        ax_plot = fig.add_subplot(gs[0, 1], sharey=ax_label)
 
     ax_label.set_xlim(0, 1)
     for category, (y_top, y_bottom) in category_blocks.items():
@@ -263,6 +288,8 @@ def plot_comparison_results(results, overall_mean, output_path, title, subtitle)
         ax_plot.axhline(boundary, linestyle=":", linewidth=0.8, color="#888888")
 
     ax_plot.set_ylim(y_lo, y_hi)
+    if xlim is not None:
+        ax_plot.set_xlim(xlim)
     ax_plot.tick_params(labelleft=False, left=False)
     ax_plot.grid(axis="y", visible=False)
     ax_plot.set_xlabel("Average Happiness Score (1=Not too happy, 2=Pretty happy, 3=Very happy)")
@@ -346,6 +373,28 @@ TITLE = "Predicted vs. actual happiness across U.S. subgroups"
 SUBTITLE = "Orange = GSS (2004-2024) true weighted averages; Red = predicted average from 1,952 survey respondents"
 
 
+def shared_xlim(results, overall_mean, pad_frac=0.05):
+    """x-axis range covering every category's actual AND predicted CI (plus the
+    overall-mean line), with the same 5% padding matplotlib's default autoscale
+    would add - so all spliced plots share one scale matching what the full,
+    unsplit plot would show."""
+    lo = min(results["ci_lo_actual"].min(), results["ci_lo_predicted"].min(), overall_mean)
+    hi = max(results["ci_hi_actual"].max(), results["ci_hi_predicted"].max(), overall_mean)
+    pad = (hi - lo) * pad_frac
+    return (lo - pad, hi + pad)
+
+
+def plot_spliced(results, overall_mean):
+    """Save the slide-sized spliced versions: same category groups, no title, shared x-scale,
+    same LHS label formatting as the full plot."""
+    xlim = shared_xlim(results, overall_mean)
+    for categories, output_file in zip(SPLICE_GROUPS, SPLICE_OUTPUT_FILES):
+        subset = results[results["category"].isin(categories)]
+        plot_comparison_results(subset, overall_mean, output_file, title=None, subtitle=None,
+                                 show_title=False, xlim=xlim)
+        print(f"Wrote spliced plot with {len(subset)} subgroup rows to {output_file}")
+
+
 def main():
     gss_df = load_gss_data(GSS_INPUT_FILE)
     actual_results, overall = build_results(gss_df)
@@ -357,6 +406,7 @@ def main():
     results = order_subgroups_by_actual_happiness(results)
 
     plot_comparison_results(results, overall["mean"], OUTPUT_FILE, TITLE, SUBTITLE)
+    plot_spliced(results, overall["mean"])
     write_markdown_table(results, overall, OUTPUT_TABLE_MD, TITLE, SUBTITLE)
     write_latex_table(results, overall, OUTPUT_TABLE_TEX, TITLE, SUBTITLE)
 
